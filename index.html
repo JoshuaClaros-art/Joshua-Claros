@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Para Alguien Especial ❤️</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #050508;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .ui-overlay {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+            pointer-events: none;
+        }
+
+        .ui-overlay * {
+            pointer-events: auto;
+        }
+
+        #start-btn {
+            background: linear-gradient(135deg, #ff416c, #ff4b2b);
+            color: #fff;
+            border: none;
+            padding: 18px 36px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(255, 65, 108, 0.6);
+            transition: all 0.3s ease;
+            outline: none;
+        }
+
+        #start-btn:hover {
+            transform: scale(1.08);
+            box-shadow: 0 0 30px rgba(255, 65, 108, 0.9);
+        }
+
+        .lyrics-box {
+            margin-top: 30px;
+            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            max-width: 90vw;
+        }
+
+        .lyric-text {
+            font-size: 2rem;
+            font-weight: 700;
+            text-transform: lowercase;
+            color: #ffffff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.8),
+                         0 0 20px rgba(255, 105, 180, 0.6),
+                         0 0 30px rgba(255, 20, 147, 0.4);
+            opacity: 0;
+            transform: translateY(15px);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+            letter-spacing: 1px;
+        }
+
+        .lyric-text.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .audio-error {
+            margin-top: 15px;
+            color: #ff6b6b;
+            font-size: 0.9rem;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 8px 16px;
+            border-radius: 8px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container">
+        <canvas id="fireworksCanvas"></canvas>
+    </div>
+
+    <div class="ui-overlay">
+        <button id="start-btn">Pulsa aquí para empezar ❤️</button>
+        <div class="lyrics-box">
+            <div id="lyric-display" class="lyric-text"></div>
+        </div>
+        <div id="audio-error" class="audio-error">
+            Nota: Asegúrate de guardar la canción como <b>FormaSer.mp3</b> en la misma carpeta.
+        </div>
+    </div>
+
+    <audio id="bg-audio" src="FormaSer.mp3" preload="auto"></audio>
+
+    <script>
+        // Configura aquí los tiempos (en segundos) de cada frase de la canción completa
+        const lyricsData = [
+            { time: 34.0, text: "te vi llegar del brazo de un amigo" },
+            { time: 39.0, text: "cuando entraste al bar y te caíste al piso" },
+            { time: 43.5, text: "me tiraste el pingüino, me tiraste el sifón" },
+            { time: 48.0, text: "estallaron los vidrios de mi corazón" },
+            { time: 52.0, text: "te vi bailar, brillando con tu ausencia" },
+            { time: 56.0, text: "sin sentir piedad, chocando con las mesas" },
+            { time: 100.0, text: "te burlaste de todos, te reíste de mí" },
+            { time: 104.0, text: "tus amigos se escaparon de vos" },
+            { time: 108.0, text: "y a mí me volvió loco tu forma de ser" }
+        ];
+
+        const startBtn = document.getElementById('start-btn');
+        const lyricDisplay = document.getElementById('lyric-display');
+        const bgAudio = document.getElementById('bg-audio');
+        const audioError = document.getElementById('audio-error');
+        const canvas = document.getElementById('fireworksCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let isRunning = false;
+        let particles = [];
+        let fireworks = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        startBtn.addEventListener('click', () => {
+            startBtn.style.display = 'none';
+            isRunning = true;
+
+            bgAudio.play().catch(err => {
+                console.warn("No se pudo reproducir el audio automáticamente:", err);
+                audioError.style.display = 'block';
+            });
+
+            animate();
+            setInterval(launchRandomFirework, 700);
+        });
+
+        bgAudio.addEventListener('timeupdate', () => {
+            const currentTime = bgAudio.currentTime;
+            let currentText = "";
+
+            for (let i = 0; i < lyricsData.length; i++) {
+                if (currentTime >= lyricsData[i].time) {
+                    currentText = lyricsData[i].text;
+                }
+            }
+
+            if (lyricDisplay.textContent !== currentText) {
+                lyricDisplay.classList.remove('active');
+                setTimeout(() => {
+                    lyricDisplay.textContent = currentText;
+                    if (currentText !== "") {
+                        lyricDisplay.classList.add('active');
+                    }
+                }, 150);
+            }
+        });
+
+        class Particle {
+            constructor(x, y, color, vx, vy, alphaDecay = 0.015) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.vx = vx;
+                this.vy = vy;
+                this.alpha = 1;
+                this.alphaDecay = alphaDecay;
+                this.gravity = 0.05;
+            }
+
+            update() {
+                this.vx *= 0.98;
+                this.vy *= 0.98;
+                this.vy += this.gravity;
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= this.alphaDecay;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = Math.max(this.alpha, 0);
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 2.5, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = this.color;
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        class Firework {
+            constructor(targetX, targetY, isHeart = false) {
+                this.x = targetX;
+                this.y = canvas.height;
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.isHeart = isHeart;
+                this.speed = 8;
+                this.angle = Math.atan2(targetY - canvas.height, targetX - canvas.width / 2);
+                this.vx = Math.cos(this.angle) * this.speed;
+                this.vy = Math.sin(this.angle) * this.speed;
+                this.exploded = false;
+                this.color = isHeart ? '#ff2a6d' : `hsl(${Math.random() * 360}, 100%, 65%)`;
+            }
+
+            update() {
+                if (!this.exploded) {
+                    this.x += this.vx;
+                    this.y += this.vy;
+
+                    if (this.y <= this.targetY) {
+                        this.exploded = true;
+                        this.explode();
+                    }
+                }
+            }
+
+            explode() {
+                if (this.isHeart) {
+                    const count = 80;
+                    for (let i = 0; i < count; i++) {
+                        const t = (Math.PI * 2 / count) * i;
+                        const heartX = 16 * Math.pow(Math.sin(t), 3);
+                        const heartY = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t));
+                        
+                        const vx = heartX * 0.25;
+                        const vy = heartY * 0.25;
+                        
+                        particles.push(new Particle(this.x, this.y, '#ff416c', vx, vy, 0.012));
+                    }
+                } else {
+                    const count = 60;
+                    for (let i = 0; i < count; i++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const speed = Math.random() * 6 + 1;
+                        const vx = Math.cos(angle) * speed;
+                        const vy = Math.sin(angle) * speed;
+                        particles.push(new Particle(this.x, this.y, this.color, vx, vy, 0.02));
+                    }
+                }
+            }
+
+            draw() {
+                if (!this.exploded) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+                    ctx.fillStyle = this.color;
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+        }
+
+        function launchRandomFirework() {
+            if (!isRunning) return;
+            const x = Math.random() * (canvas.width * 0.8) + (canvas.width * 0.1);
+            const y = Math.random() * (canvas.height * 0.4) + (canvas.height * 0.1);
+            const isHeart = Math.random() < 0.4;
+            fireworks.push(new Firework(x, y, isHeart));
+        }
+
+        function animate() {
+            if (!isRunning) return;
+            requestAnimationFrame(animate);
+
+            ctx.fillStyle = 'rgba(5, 5, 8, 0.2)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            fireworks.forEach((fw, index) => {
+                fw.update();
+                fw.draw();
+                if (fw.exploded) {
+                    fireworks.splice(index, 1);
+                }
+            });
+
+            particles.forEach((p, index) => {
+                p.update();
+                p.draw();
+                if (p.alpha <= 0) {
+                    particles.splice(index, 1);
+                }
+            });
+        }
+    </script>
+</body>
+</html>
